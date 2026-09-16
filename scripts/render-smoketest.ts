@@ -159,6 +159,15 @@ async function main() {
       `  [${p.startMs}-${p.endMs}] (${p.text.length} chars, ${p.words.length}w) "${p.text}"`
     );
   }
+
+  // Chapter-heading title cards, like "01. Everyone grows differently" in
+  // the reference footage — a separate mid-frame overlay track, not part
+  // of the spoken captions.
+  grouped.titles = [
+    { id: 't1', text: '01. Consistency beats motivation', startMs: 400, endMs: 3200 },
+    { id: 't2', text: '02. Nobody watches your first 90 reels', startMs: 8900, endMs: 12300 },
+  ];
+
   await fs.writeFile(path.join(outDir, 'captions.json'), JSON.stringify(grouped, null, 2));
 
   const results: { presetId: string; ok: boolean; error?: string; outPath?: string }[] = [];

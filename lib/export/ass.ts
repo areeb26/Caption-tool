@@ -1,5 +1,5 @@
-import type { CaptionDoc, CaptionPhrase } from '../captionTypes';
-import { getTemplate, type CaptionTemplate } from '../templates';
+import type { CaptionDoc, CaptionPhrase, CaptionTitle } from '../captionTypes';
+import { getTemplate, TITLE_CARD_STYLE, type CaptionTemplate } from '../templates';
 
 // Standard vertical render target for Reels/TikTok-style output.
 const PLAY_RES_X = 1080;
@@ -100,7 +100,7 @@ function wrapLines(text: string, maxWidthPx: number, sizePx: number, maxLines: n
   return lines;
 }
 
-function buildStyleLine(template: CaptionTemplate): string {
+function buildStyleLine(template: CaptionTemplate, styleName = 'Default'): string {
   const size = fontSizePx(template);
   const primary = hexToAssColor(template.fill === 'transparent' ? '#FFFFFF' : template.fill);
   const outline = hexToAssColor(
@@ -114,7 +114,7 @@ function buildStyleLine(template: CaptionTemplate): string {
   // Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,
   // Alignment,MarginL,MarginR,MarginV,Encoding
   return [
-    'Style: Default',
+    `Style: ${styleName}`,
     BUNDLED_FONT_NAME,
     size,
     primary,
@@ -259,6 +259,14 @@ function renderPhraseText(template: CaptionTemplate, phrase: CaptionPhrase): str
   return `${hollowTag}${escapeAssText(lines.join('\n')).replace(/\n/g, '\\N')}`;
 }
 
+function renderTitleText(template: CaptionTemplate, title: CaptionTitle): string {
+  const size = fontSizePx(template);
+  const maxWidthPx = (template.maxWidthPct / 100) * PLAY_RES_X;
+  const text = transformedText(template, title.text);
+  const lines = wrapLines(text, maxWidthPx, size, template.maxLines);
+  return escapeAssText(lines.join('\n')).replace(/\n/g, '\\N');
+}
+
 function renderKaraokeText(template: CaptionTemplate, phrase: CaptionPhrase): string {
   const k = template.karaoke!;
   const inactive = hexToAssColor(k.inactiveColor);
@@ -310,6 +318,7 @@ function glowLine(
 export function generateAss(doc: CaptionDoc, presetIdOverride?: string): string {
   const template = getTemplate(presetIdOverride ?? doc.presetId);
   const styleLine = buildStyleLine(template);
+  const titleStyleLine = buildStyleLine(TITLE_CARD_STYLE, 'TitleCard');
 
   const header = [
     '[Script Info]',
@@ -322,6 +331,7 @@ export function generateAss(doc: CaptionDoc, presetIdOverride?: string): string 
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
     styleLine,
+    titleStyleLine,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
@@ -365,6 +375,30 @@ export function generateAss(doc: CaptionDoc, presetIdOverride?: string): string 
 
     events.push(
       `Dialogue: 1,${start},${end},Default,,0,0,0,,{\\an5${pos}${transform}}${bodyText}`
+    );
+  }
+
+  const cleanTitles = (doc.titles ?? [])
+    .filter((t) => t.text.trim().length > 0)
+    .map((t) => ({ ...t, endMs: Math.max(t.endMs, t.startMs + MIN_EVENT_MS) }))
+    .sort((a, b) => a.startMs - b.startMs);
+  for (let i = 0; i < cleanTitles.length - 1; i++) {
+    if (cleanTitles[i].endMs > cleanTitles[i + 1].startMs) {
+      cleanTitles[i].endMs = Math.max(
+        cleanTitles[i].startMs + MIN_EVENT_MS,
+        cleanTitles[i + 1].startMs
+      );
+    }
+  }
+
+  const titlePos = positionTag(TITLE_CARD_STYLE);
+  const titleTransform = phraseTransformTag(TITLE_CARD_STYLE);
+  for (const title of cleanTitles) {
+    const start = msToAssTime(title.startMs);
+    const end = msToAssTime(title.endMs);
+    const bodyText = renderTitleText(TITLE_CARD_STYLE, title);
+    events.push(
+      `Dialogue: 2,${start},${end},TitleCard,,0,0,0,,{\\an5${titlePos}${titleTransform}}${bodyText}`
     );
   }
 

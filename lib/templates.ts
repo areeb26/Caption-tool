@@ -266,6 +266,45 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   }),
 };
 
+/**
+ * Fixed look for `CaptionDoc.titles` — the big yellow "chapter heading" text
+ * seen mid-frame in hook/listicle edits ("01. Everyone grows differently"),
+ * separate from the bottom spoken-caption track. Not user-selectable like
+ * the 10 presets; every template uses the same title-card look since it's
+ * an independent overlay, not a caption style.
+ */
+export const TITLE_CARD_STYLE: CaptionTemplate = {
+  presetId: 'title-card',
+  label: 'Title Card',
+  fontFamily: `"Montserrat", "Arial Black", system-ui, sans-serif`,
+  fontWeight: 800,
+  fontSizeVmin: 6.4,
+  letterSpacingEm: -0.01,
+  lineHeight: 1.2,
+  textTransform: 'none',
+  fill: '#FFE600',
+  strokeColor: 'transparent',
+  strokeWidthEm: 0,
+  shadow: '0 0.05em 0.1em rgba(0,0,0,0.65)',
+  align: 'center',
+  anchorXPct: 50,
+  anchorYPct: 46,
+  maxWidthPct: 82,
+  maxLines: 3,
+  paddingXEm: 0,
+  paddingYEm: 0,
+  background: null,
+  phraseWordsMin: 1,
+  phraseWordsMax: 99,
+  phraseMaxChars: 999,
+  animation: 'phrase-pop',
+  animDurationMs: 180,
+  animEasing: 'cubic-bezier(0.2,0.9,0.3,1)',
+  exit: 'fade',
+  safeMarginBottomPct: 5,
+  safeMarginSidesPct: 9,
+};
+
 export const DEFAULT_PRESET_ID = 'viral-yellow';
 
 export const TEMPLATE_LIST = Object.values(TEMPLATES);

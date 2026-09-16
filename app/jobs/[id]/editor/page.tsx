@@ -3,8 +3,36 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CaptionOverlay } from '@/components/CaptionOverlay';
-import { TEMPLATE_LIST, getTemplate } from '@/lib/templates';
-import type { CaptionDoc, CaptionPhrase } from '@/lib/captionTypes';
+import { TEMPLATE_LIST, TITLE_CARD_STYLE, getTemplate } from '@/lib/templates';
+import type { CaptionDoc, CaptionPhrase, CaptionTitle } from '@/lib/captionTypes';
+
+function TitleCardOverlay({ title }: { title: CaptionTitle | null }) {
+  if (!title) return null;
+  const t = TITLE_CARD_STYLE;
+  return (
+    <div className="caption-overlay">
+      <div
+        style={{
+          position: 'absolute',
+          left: `${t.anchorXPct}%`,
+          top: `${t.anchorYPct}%`,
+          transform: 'translate(-50%, -50%)',
+          maxWidth: `${t.maxWidthPct}%`,
+          textAlign: t.align,
+          fontFamily: t.fontFamily,
+          fontWeight: t.fontWeight,
+          fontSize: `${t.fontSizeVmin}vmin`,
+          letterSpacing: `${t.letterSpacingEm}em`,
+          lineHeight: t.lineHeight,
+          color: t.fill,
+          textShadow: t.shadow ?? undefined,
+        }}
+      >
+        {title.text}
+      </div>
+    </div>
+  );
+}
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,6 +62,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const activePhrase: CaptionPhrase | null = useMemo(() => {
     if (!doc) return null;
     return doc.phrases.find((p) => currentMs >= p.startMs && currentMs < p.endMs) ?? null;
+  }, [doc, currentMs]);
+
+  const activeTitle: CaptionTitle | null = useMemo(() => {
+    if (!doc?.titles) return null;
+    return doc.titles.find((t) => currentMs >= t.startMs && currentMs < t.endMs) ?? null;
   }, [doc, currentMs]);
 
   const persist = useCallback(
@@ -124,6 +157,43 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     commitPhrases({ ...doc, phrases });
   };
 
+  const addTitleCard = () => {
+    if (!doc) return;
+    const startMs = Math.round(currentMs);
+    const newTitle: CaptionTitle = {
+      id: `t${Date.now()}`,
+      text: 'New title',
+      startMs,
+      endMs: startMs + 2000,
+    };
+    const next = { ...doc, titles: [...(doc.titles ?? []), newTitle] };
+    commitPhrases(next);
+  };
+
+  const updateTitleText = (id: string, text: string) => {
+    if (!doc) return;
+    const next = { ...doc, titles: (doc.titles ?? []).map((t) => (t.id === id ? { ...t, text } : t)) };
+    setDoc(next);
+  };
+
+  const nudgeTitle = (id: string, field: 'startMs' | 'endMs', deltaMs: number) => {
+    if (!doc) return;
+    const next: CaptionDoc = {
+      ...doc,
+      titles: (doc.titles ?? []).map((t) => {
+        if (t.id !== id) return t;
+        const value = Math.max(0, t[field] + deltaMs);
+        return field === 'startMs' ? { ...t, startMs: value } : { ...t, endMs: value };
+      }),
+    };
+    commitPhrases(next);
+  };
+
+  const removeTitle = (id: string) => {
+    if (!doc) return;
+    commitPhrases({ ...doc, titles: (doc.titles ?? []).filter((t) => t.id !== id) });
+  };
+
   const startExport = async () => {
     setExportError(null);
     setExporting(true);
@@ -149,7 +219,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             onTimeUpdate={(e) => setCurrentMs(e.currentTarget.currentTime * 1000)}
           />
           <CaptionOverlay phrase={activePhrase} template={template} currentMs={currentMs} />
+          <TitleCardOverlay title={activeTitle} />
         </div>
+
+        <button className="btn" style={{ marginTop: 12 }} onClick={addTitleCard}>
+          + Add title card at current time
+        </button>
 
         <h3 style={{ marginTop: 24 }}>Style</h3>
         <div className="template-strip">
@@ -173,7 +248,37 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       </div>
 
       <div>
-        <h3>Phrases</h3>
+        <h3>Title cards</h3>
+        <div className="phrase-list">
+          {(doc.titles ?? []).length === 0 && (
+            <p style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              No title cards yet — big yellow headline text overlaid mid-frame, separate from the
+              spoken captions below.
+            </p>
+          )}
+          {(doc.titles ?? []).map((title) => (
+            <div key={title.id} className="phrase-row">
+              <input
+                type="text"
+                value={title.text}
+                onChange={(e) => updateTitleText(title.id, e.target.value)}
+                onBlur={() => commitPhrases(doc)}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+                {(title.startMs / 1000).toFixed(2)}s – {(title.endMs / 1000).toFixed(2)}s
+              </div>
+              <div className="phrase-actions">
+                <button onClick={() => nudgeTitle(title.id, 'startMs', -250)}>start -250ms</button>
+                <button onClick={() => nudgeTitle(title.id, 'startMs', 250)}>start +250ms</button>
+                <button onClick={() => nudgeTitle(title.id, 'endMs', -250)}>end -250ms</button>
+                <button onClick={() => nudgeTitle(title.id, 'endMs', 250)}>end +250ms</button>
+                <button onClick={() => removeTitle(title.id)}>delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <h3 style={{ marginTop: 24 }}>Phrases</h3>
         <div className="phrase-list">
           {doc.phrases.map((phrase, index) => (
             <div key={phrase.id} className="phrase-row">
