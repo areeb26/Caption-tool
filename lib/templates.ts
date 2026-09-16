@@ -59,23 +59,33 @@ export interface CaptionTemplate {
   glow?: { color: string; blur: number; opacity: number };
 }
 
+// Re-derived from the actual reference reel (a talking-head Hinglish
+// creator video), not just the written token table: real "viral" bottom
+// captions there are small, clean, and shadow-only — no thick black
+// stroke, no forced lowercasing, sitting right near the bottom edge. The
+// original bigger/stroked/lowercase take on this preset was a misreading
+// of the spec and didn't match the actual footage it was supposed to
+// mirror. The other 9 presets (genuinely modeled on the bold
+// Hormozi/outline/etc. looks) keep their previous sizing/case/position by
+// overriding these fields explicitly below, so this change only affects
+// `viral-yellow` itself.
 const VIRAL_YELLOW: CaptionTemplate = {
   presetId: 'viral-yellow',
   label: 'Viral Yellow',
   fontFamily: `"Montserrat", "Arial Black", system-ui, sans-serif`,
-  fontWeight: 900,
-  fontSizeVmin: 7.2,
-  letterSpacingEm: -0.02,
-  lineHeight: 1.05,
-  textTransform: 'lowercase',
+  fontWeight: 800,
+  fontSizeVmin: 4.3,
+  letterSpacingEm: 0,
+  lineHeight: 1.15,
+  textTransform: 'none',
   fill: '#FFE600',
-  strokeColor: '#000000',
-  strokeWidthEm: 0.12,
-  shadow: '0 0.04em 0 #000000',
+  strokeColor: 'transparent',
+  strokeWidthEm: 0,
+  shadow: '0 0.08em 0.14em rgba(0,0,0,0.6)',
   align: 'center',
   anchorXPct: 50,
-  anchorYPct: 78,
-  maxWidthPct: 86,
+  anchorYPct: 91,
+  maxWidthPct: 90,
   maxLines: 2,
   paddingXEm: 0,
   paddingYEm: 0,
@@ -84,10 +94,10 @@ const VIRAL_YELLOW: CaptionTemplate = {
   phraseWordsMax: 5,
   phraseMaxChars: 42,
   animation: 'phrase-pop',
-  animDurationMs: 120,
+  animDurationMs: 100,
   animEasing: 'cubic-bezier(0.2,0.9,0.3,1)',
   exit: 'hard-cut',
-  safeMarginBottomPct: 12,
+  safeMarginBottomPct: 5,
   safeMarginSidesPct: 7,
 };
 
@@ -98,9 +108,22 @@ function extend(overrides: Partial<CaptionTemplate> & { presetId: string; label:
 export const TEMPLATES: Record<string, CaptionTemplate> = {
   'viral-yellow': VIRAL_YELLOW,
 
+  // Everything below explicitly restates the big/bold/lowercase/stroked
+  // sizing (fontSizeVmin 7.2, letterSpacingEm -0.02, textTransform
+  // lowercase, anchorYPct 78, safeMarginBottomPct 12) that used to come
+  // for free from VIRAL_YELLOW, since that base was resized down to match
+  // the actual small-caption reference footage. These 9 are genuinely
+  // meant to be big/bold (that's the Hormozi/outline/neon look), so they
+  // keep the old numbers rather than silently shrinking.
+
   'hormozi-white': extend({
     presetId: 'hormozi-white',
     label: 'Hormozi White',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: '#FFFFFF',
     strokeColor: '#000000',
     strokeWidthEm: 0.14,
@@ -110,6 +133,11 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'hormozi-box': extend({
     presetId: 'hormozi-box',
     label: 'Hormozi Box',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: '#FFFFFF',
     strokeColor: '#000000',
     strokeWidthEm: 0.0,
@@ -122,6 +150,11 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'karaoke-highlight': extend({
     presetId: 'karaoke-highlight',
     label: 'Karaoke Highlight',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: '#FFFFFF',
     strokeColor: '#000000',
     strokeWidthEm: 0.12,
@@ -132,6 +165,11 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'neon-pop': extend({
     presetId: 'neon-pop',
     label: 'Neon Pop',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: '#FF2D95',
     strokeColor: '#1a001a',
     strokeWidthEm: 0.1,
@@ -143,6 +181,11 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'outline-only': extend({
     presetId: 'outline-only',
     label: 'Outline Only',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: 'transparent',
     strokeColor: '#FFFFFF',
     strokeWidthEm: 0.14,
@@ -153,6 +196,11 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'stack-two-tone': extend({
     presetId: 'stack-two-tone',
     label: 'Stack Two-Tone',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: '#FFFFFF',
     strokeColor: '#000000',
     strokeWidthEm: 0.12,
@@ -164,6 +212,13 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'emoji-pop': extend({
     presetId: 'emoji-pop',
     label: 'Emoji Pop',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
+    strokeColor: '#000000',
+    strokeWidthEm: 0.12,
     animation: 'phrase-pop',
     emojiMap: {
       money: '💰',
@@ -178,6 +233,10 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
     presetId: 'minimal-caption',
     label: 'Minimal Caption',
     fontSizeVmin: 5,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    anchorYPct: 78,
+    safeMarginBottomPct: 12,
     fill: '#F5F5F5',
     strokeColor: 'transparent',
     strokeWidthEm: 0,
@@ -190,6 +249,10 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
   'bar-lower-third': extend({
     presetId: 'bar-lower-third',
     label: 'Bar Lower Third',
+    fontSizeVmin: 7.2,
+    letterSpacingEm: -0.02,
+    textTransform: 'lowercase',
+    safeMarginBottomPct: 12,
     fill: '#FFFFFF',
     strokeColor: 'transparent',
     strokeWidthEm: 0,

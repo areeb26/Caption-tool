@@ -21,11 +21,15 @@ if (!sourceVideo || !outDirArg) {
 }
 const outDir = path.resolve(outDirArg);
 
+// Natural case + punctuation, like real ASR output (Deepgram/AssemblyAI
+// both return punctuated, cased transcripts) — needed to exercise
+// `textTransform: 'none'` on viral-yellow properly instead of masking it
+// with all-lowercase test input.
 const NARRATION =
-  'if you want to grow your business you have to fire your excuses right now ' +
-  'save this video and thank me later this is the secret nobody tells you ' +
-  'love the process stack your money and give value every single day ' +
-  'that is the real tip nobody shares';
+  'If you want to grow your business, you have to fire your excuses right now. ' +
+  'Save this video and thank me later, this is the secret nobody tells you. ' +
+  'Love the process, stack your money, and give value every single day. ' +
+  'That is the real tip nobody shares.';
 
 function buildEvenlySpacedWords(text: string, durationMs: number): TranscriptWord[] {
   const words = text.split(/\s+/).filter(Boolean);
