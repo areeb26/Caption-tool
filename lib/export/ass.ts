@@ -5,6 +5,19 @@ import { getTemplate, type CaptionTemplate } from '../templates';
 const PLAY_RES_X = 1080;
 const PLAY_RES_Y = 1920;
 
+// Self-hosted font bundled at /fonts/Montserrat-Black.ttf (see lib/export/burnin.ts,
+// which points ffmpeg's `ass` filter at that directory via `fontsdir=`). This is the
+// one real weight we ship, so every template renders through it rather than whatever
+// fallback sans the host happens to have — the font is what actually sells "viral".
+const BUNDLED_FONT_NAME = 'Montserrat Black';
+
+// Minimum visible duration for a caption event, and the floor we clamp
+// overlapping/out-of-order phrase timings to. Guards against garbled
+// double-exposed text when two phrases' time ranges collide (e.g. from a
+// careless manual nudge in the editor) and against degenerate zero/negative
+// duration events from bad input.
+const MIN_EVENT_MS = 60;
+
 function msToAssTime(ms: number): string {
   const total = Math.max(0, Math.round(ms));
   const h = Math.floor(total / 3_600_000);
@@ -49,6 +62,44 @@ function fontSizePx(template: CaptionTemplate): number {
   return Math.round(template.fontSizeVmin * vminBasis);
 }
 
+/**
+ * Greedy word-wrap a line of text to at most `maxLines` lines, each no
+ * wider than `maxWidthPx` (approximated from an average glyph width for a
+ * bold condensed sans at the given font size). A single word longer than a
+ * full line is kept intact on its own line rather than being butchered —
+ * real caption phrases are capped at 42 chars upstream, so this is a safety
+ * net for pathological/manually-edited text, not the common case.
+ */
+function wrapLines(text: string, maxWidthPx: number, sizePx: number, maxLines: number): string[] {
+  const avgCharWidth = sizePx * 0.58;
+  const maxCharsPerLine = Math.max(1, Math.floor(maxWidthPx / avgCharWidth));
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [''];
+
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxCharsPerLine && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+
+  if (lines.length > maxLines) {
+    // Collapse any overflow lines into the last kept line rather than
+    // silently dropping words.
+    const kept = lines.slice(0, maxLines - 1);
+    const rest = lines.slice(maxLines - 1).join(' ');
+    kept.push(rest);
+    return kept;
+  }
+  return lines;
+}
+
 function buildStyleLine(template: CaptionTemplate): string {
   const size = fontSizePx(template);
   const primary = hexToAssColor(template.fill === 'transparent' ? '#FFFFFF' : template.fill);
@@ -57,7 +108,6 @@ function buildStyleLine(template: CaptionTemplate): string {
   );
   const outlineWidth = template.strokeWidthEm > 0 ? emToPx(template.strokeWidthEm, size) / 4 : 0;
   const shadowWidth = template.shadow ? Math.max(2, Math.round(size * 0.04)) : 0;
-  const bold = template.fontWeight >= 700 ? -1 : 0;
   const spacing = Math.round(template.letterSpacingEm * size);
 
   // Style: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,
@@ -65,13 +115,16 @@ function buildStyleLine(template: CaptionTemplate): string {
   // Alignment,MarginL,MarginR,MarginV,Encoding
   return [
     'Style: Default',
-    template.fontFamily.split(',')[0].replace(/"/g, '').trim() || 'Arial',
+    BUNDLED_FONT_NAME,
     size,
     primary,
     primary,
     outline,
     '&H00000000&',
-    bold,
+    // We ship the exact Black (900) weight as its own font file, so we never
+    // ask libass to synthesize bold on top of it — that would over-thicken
+    // strokes and blob out counters (the inside of "a", "o", etc).
+    0,
     0,
     0,
     0,
@@ -117,6 +170,16 @@ function positionTag(template: CaptionTemplate): string {
   return `\\pos(${x},${y})`;
 }
 
+/**
+ * For `outline-only`-style presets (`fill: 'transparent'`), make the glyph
+ * interior actually see-through instead of solid white, so the background
+ * shows through and only the stroke reads — the "hollow letters" look the
+ * preset is named for.
+ */
+function hollowFillTag(template: CaptionTemplate): string {
+  return template.fill === 'transparent' ? '\\1a&HFF&' : '';
+}
+
 function backgroundBoxLine(
   template: CaptionTemplate,
   start: string,
@@ -157,11 +220,10 @@ function roundedRectPath(w: number, h: number, r: number): string {
   } l 0 ${radius} b 0 0 0 0 ${radius} 0`;
 }
 
-function renderPhraseText(template: CaptionTemplate, phrase: CaptionPhrase): string {
-  let text = phrase.text;
+function transformedText(template: CaptionTemplate, rawText: string): string {
+  let text = rawText;
   if (template.textTransform === 'lowercase') text = text.toLowerCase();
   if (template.textTransform === 'uppercase') text = text.toUpperCase();
-
   if (template.emojiMap) {
     const words = text.split(/\s+/);
     text = words
@@ -172,34 +234,73 @@ function renderPhraseText(template: CaptionTemplate, phrase: CaptionPhrase): str
       })
       .join(' ');
   }
+  return text;
+}
+
+function renderPhraseText(template: CaptionTemplate, phrase: CaptionPhrase): string {
+  const size = fontSizePx(template);
+  const maxWidthPx = (template.maxWidthPct / 100) * PLAY_RES_X;
+  const hollow = hollowFillTag(template);
 
   if (template.twoTone && phrase.words.length > 1) {
     const mid = Math.ceil(phrase.words.length / 2);
-    const line1 = phrase.words.slice(0, mid).map((w) => w.text).join(' ');
-    const line2 = phrase.words.slice(mid).map((w) => w.text).join(' ');
+    const line1 = transformedText(template, phrase.words.slice(0, mid).map((w) => w.text).join(' '));
+    const line2 = transformedText(template, phrase.words.slice(mid).map((w) => w.text).join(' '));
     const c1 = hexToAssColor(template.twoTone.line1Color);
     const c2 = hexToAssColor(template.twoTone.line2Color);
-    return `{\\1c${c1}}${escapeAssText(line1)}\\N{\\1c${c2}}${escapeAssText(line2)}`;
+    return `{\\1c${c1}${hollow}}${escapeAssText(line1)}\\N{\\1c${c2}${hollow}}${escapeAssText(
+      line2
+    )}`;
   }
 
-  return escapeAssText(text);
+  const text = transformedText(template, phrase.text);
+  const lines = wrapLines(text, maxWidthPx, size, template.maxLines);
+  const hollowTag = hollow ? `{${hollow}}` : '';
+  return `${hollowTag}${escapeAssText(lines.join('\n')).replace(/\n/g, '\\N')}`;
 }
 
 function renderKaraokeText(template: CaptionTemplate, phrase: CaptionPhrase): string {
   const k = template.karaoke!;
   const inactive = hexToAssColor(k.inactiveColor);
   const active = hexToAssColor(k.activeColor);
+  const activeScale = Math.round(k.activeScale * 100);
+  const phraseStart = phrase.startMs;
+
   return phrase.words
     .map((w) => {
-      const durCs = Math.max(1, Math.round((w.endMs - w.startMs) / 10));
-      // \k tags drive libass's built-in karaoke color sweep; we also
-      // override with an explicit color animation as a closer approximation
-      // of the "scale up while active" spec via \t on a per-syllable basis.
-      return `{\\kf${durCs}\\1c${inactive}\\t(0,${durCs * 10},\\1c${active}\\fscx112\\fscy112)}${escapeAssText(
-        w.text + ' '
-      )}`;
+      // Offsets are relative to the *dialogue event's* start time (phrase
+      // start), which is how ASS \t() timing works — every word's ramp must
+      // be keyed to its own absolute position in the phrase, not to 0,
+      // otherwise every word's transform fires simultaneously at t=0 and
+      // the whole phrase ends up highlighted at once instead of sweeping
+      // word-by-word.
+      const wStart = Math.max(0, w.startMs - phraseStart);
+      const wEnd = Math.max(wStart + 1, w.endMs - phraseStart);
+      const revertBy = wEnd + 80;
+      return (
+        `{\\1c${inactive}\\fscx100\\fscy100` +
+        `\\t(${wStart},${wEnd},\\1c${active}\\fscx${activeScale}\\fscy${activeScale})` +
+        `\\t(${wEnd},${revertBy},\\1c${inactive}\\fscx100\\fscy100)}` +
+        `${escapeAssText(w.text + ' ')}`
+      );
     })
     .join('');
+}
+
+/** Optional soft glow used by `neon-pop`: a blurred, low-alpha duplicate of
+ * the text painted on a layer behind the crisp main text. */
+function glowLine(
+  template: CaptionTemplate,
+  start: string,
+  end: string,
+  bodyText: string,
+  pos: string
+): string | null {
+  if (!template.glow) return null;
+  const color = hexToAssColor(template.glow.color);
+  return `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\an5${pos}\\1c${color}\\bord0\\shad0\\blur${template.glow.blur}\\alpha&H${alphaHex(
+    template.glow.opacity
+  )}&}${bodyText}`;
 }
 
 /**
@@ -228,7 +329,23 @@ export function generateAss(doc: CaptionDoc, presetIdOverride?: string): string 
 
   const events: string[] = [];
 
-  for (const phrase of doc.phrases) {
+  // Drop blank/whitespace-only phrases and clamp overlapping/out-of-order
+  // timings so two phrases never occupy the same on-screen moment at the
+  // same position (which otherwise renders as illegible double-exposed
+  // text). Phrases are expected to already be sequential from the phrase
+  // grouper, but the editor lets a user nudge start/end independently, so
+  // this is a defensive floor, not the primary guarantee.
+  const clean = doc.phrases
+    .filter((p) => p.text.trim().length > 0)
+    .map((p) => ({ ...p, startMs: p.startMs, endMs: Math.max(p.endMs, p.startMs + MIN_EVENT_MS) }))
+    .sort((a, b) => a.startMs - b.startMs);
+  for (let i = 0; i < clean.length - 1; i++) {
+    if (clean[i].endMs > clean[i + 1].startMs) {
+      clean[i].endMs = Math.max(clean[i].startMs + MIN_EVENT_MS, clean[i + 1].startMs);
+    }
+  }
+
+  for (const phrase of clean) {
     const start = msToAssTime(phrase.startMs);
     const end = msToAssTime(phrase.endMs);
 
@@ -242,6 +359,10 @@ export function generateAss(doc: CaptionDoc, presetIdOverride?: string): string 
 
     const transform = phraseTransformTag(template);
     const pos = positionTag(template);
+
+    const glow = glowLine(template, start, end, bodyText, pos);
+    if (glow) events.push(glow);
+
     events.push(
       `Dialogue: 1,${start},${end},Default,,0,0,0,,{\\an5${pos}${transform}}${bodyText}`
     );

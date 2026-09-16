@@ -74,6 +74,13 @@ export async function probeDurationMs(sourcePath: string): Promise<number> {
  * Burn captions into a video using a generated ASS subtitle file + libass,
  * via `ffmpeg -vf ass=...`. Writes the rendered MP4 to `destMp4Path`.
  */
+// Self-hosted fonts shipped with the app (see lib/export/ass.ts for the
+// exact family name libass is told to use). Passed to the `ass` filter via
+// `fontsdir=` so rendering never depends on whatever fonts happen to be
+// installed on the host — the whole point of locking a design token like
+// "Montserrat Black" is that it looks the same everywhere.
+const FONTS_DIR = path.join(process.cwd(), 'fonts');
+
 export async function burnInCaptions(
   sourceVideoPath: string,
   captionDoc: CaptionDoc,
@@ -87,16 +94,17 @@ export async function burnInCaptions(
     await fs.writeFile(assPath, assContent, 'utf-8');
     await fs.mkdir(path.dirname(destMp4Path), { recursive: true });
 
-    // libass needs a filesystem path; escape for the ffmpeg filter-graph
+    // libass needs filesystem paths; escape for the ffmpeg filter-graph
     // (colons and backslashes are special inside -vf ass=... on all platforms).
     const escapedAssPath = assPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+    const escapedFontsDir = FONTS_DIR.replace(/\\/g, '/').replace(/:/g, '\\:');
 
     await run('ffmpeg', [
       '-y',
       '-i',
       sourceVideoPath,
       '-vf',
-      `ass=${escapedAssPath}`,
+      `ass=${escapedAssPath}:fontsdir=${escapedFontsDir}`,
       '-c:v',
       'libx264',
       '-preset',

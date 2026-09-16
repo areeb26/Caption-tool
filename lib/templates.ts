@@ -55,6 +55,8 @@ export interface CaptionTemplate {
   };
   emojiMap?: Record<string, string>;
   twoTone?: { line1Color: string; line2Color: string; staggerMs: number };
+  /** Soft blurred halo painted behind the main text (`neon-pop`). */
+  glow?: { color: string; blur: number; opacity: number };
 }
 
 const VIRAL_YELLOW: CaptionTemplate = {
@@ -135,6 +137,7 @@ export const TEMPLATES: Record<string, CaptionTemplate> = {
     strokeWidthEm: 0.1,
     shadow: '0 0 0.25em #FF2D95',
     animation: 'bounce-pop',
+    glow: { color: '#FF2D95', blur: 8, opacity: 0.55 },
   }),
 
   'outline-only': extend({
