@@ -1,0 +1,11 @@
+{$DOMAIN} {
+	request_body {
+		max_size 600MB
+	}
+	reverse_proxy app:3000 {
+		# Exports/transcription run inside the request, so allow long responses.
+		transport http {
+			response_header_timeout 15m
+		}
+	}
+}

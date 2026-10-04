@@ -15,7 +15,12 @@ export async function transcribeWithWhisper(
     throw new AsrError('whisper', 'OPENAI_API_KEY is not set');
   }
 
-  const audioRes = await fetch(audioUrl).catch((err) => {
+  // Local-storage mode hands back a same-origin relative path; Node's fetch
+  // needs an absolute URL, so resolve it against this server itself.
+  const absoluteUrl = audioUrl.startsWith('/')
+    ? `http://127.0.0.1:${process.env.PORT || 3000}${audioUrl}`
+    : audioUrl;
+  const audioRes = await fetch(absoluteUrl).catch((err) => {
     throw new AsrError('whisper', 'failed to fetch audio for upload', err);
   });
   if (!audioRes.ok) {
