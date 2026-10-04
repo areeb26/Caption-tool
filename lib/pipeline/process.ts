@@ -11,6 +11,7 @@ import { db, schema } from '@/db';
 import { downloadToTmp, getSignedDownloadUrl, uploadFromTmp } from '@/lib/storage';
 import { extractAudio, probeDurationMs } from '@/lib/export/burnin';
 import { DEFAULT_VENDOR_ORDER, transcribeWithFallback, type AsrVendor } from '@/lib/asr';
+import { romanizeUrduWords } from '@/lib/asr/romanize';
 import { groupWordsIntoPhrases } from '@/lib/phraseGrouper';
 
 export async function runProcessingPipeline(jobId: string): Promise<void> {
@@ -44,11 +45,21 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
       .where(eq(schema.jobs.id, jobId));
 
     const audioUrl = await getSignedDownloadUrl(audioKey);
-    const preferredOrder = (process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as
-      | AsrVendor[]
-      | undefined) ?? DEFAULT_VENDOR_ORDER;
+    // CAPTION_LANGUAGE=roman-urdu: Whisper transcribes Urdu, then we romanize it.
+    // Whisper is the only vendor used for this mode (it handles Urdu well and
+    // lets us pin the language).
+    const romanUrdu = process.env.CAPTION_LANGUAGE === 'roman-urdu';
+    const preferredOrder: AsrVendor[] = romanUrdu
+      ? ['whisper']
+      : ((process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as AsrVendor[] | undefined) ??
+        DEFAULT_VENDOR_ORDER);
 
-    const transcript = await transcribeWithFallback(preferredOrder, audioUrl);
+    const transcript = await transcribeWithFallback(
+      preferredOrder,
+      audioUrl,
+      romanUrdu ? 'ur' : undefined
+    );
+    if (romanUrdu) transcript.words = await romanizeUrduWords(transcript.words);
 
     await setStatus(jobId, 'grouping');
     const captionDoc = groupWordsIntoPhrases(transcript.words, 'viral-yellow');

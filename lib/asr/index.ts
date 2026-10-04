@@ -7,7 +7,8 @@ export * from './types';
 
 export async function transcribe(
   vendor: AsrVendor,
-  audioUrl: string
+  audioUrl: string,
+  language?: string
 ): Promise<TranscriptResult> {
   switch (vendor) {
     case 'deepgram':
@@ -15,7 +16,7 @@ export async function transcribe(
     case 'assemblyai':
       return transcribeWithAssemblyAI(audioUrl);
     case 'whisper':
-      return transcribeWithWhisper(audioUrl);
+      return transcribeWithWhisper(audioUrl, language);
     default:
       throw new AsrError(vendor, `unknown ASR vendor`);
   }
@@ -30,12 +31,13 @@ export const DEFAULT_VENDOR_ORDER: AsrVendor[] = ['deepgram', 'assemblyai', 'whi
  */
 export async function transcribeWithFallback(
   preferredOrder: AsrVendor[],
-  audioUrl: string
+  audioUrl: string,
+  language?: string
 ): Promise<TranscriptResult> {
   const errors: string[] = [];
   for (const vendor of preferredOrder) {
     try {
-      return await transcribe(vendor, audioUrl);
+      return await transcribe(vendor, audioUrl, language);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       errors.push(message);
