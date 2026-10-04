@@ -45,14 +45,11 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
       .where(eq(schema.jobs.id, jobId));
 
     const audioUrl = await getSignedDownloadUrl(audioKey);
-    // Roman Urdu: Whisper transcribes Urdu, then we romanize it. Whisper is
+    // Roman Urdu: the engine transcribes Urdu, then we romanize it. Whisper is
     // the only vendor used for this mode (it handles Urdu well and lets us
     // pin the language). WHISPER_PROVIDER=huggingface runs it on Hugging Face.
     const romanUrdu = job.language === 'roman-urdu';
-    const preferredOrder: AsrVendor[] = romanUrdu
-      ? [romanAsrVendor()]
-      : ((process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as AsrVendor[] | undefined) ??
-        DEFAULT_VENDOR_ORDER);
+    const preferredOrder = vendorOrder(romanUrdu);
 
     const transcript = await transcribeWithFallback(
       preferredOrder,
@@ -86,11 +83,20 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
   }
 }
 
-// WHISPER_PROVIDER picks the Roman Urdu transcription engine:
-// 'huggingface', 'gemini' (approximate word timing), or default OpenAI/local Whisper.
-function romanAsrVendor(): AsrVendor {
-  const p = process.env.WHISPER_PROVIDER;
-  return p === 'huggingface' || p === 'gemini' ? p : 'whisper';
+// Which transcription engine(s) to try, in order.
+// - WHISPER_PROVIDER ('whisper' | 'huggingface' | 'gemini') pins one engine for
+//   every language. Gemini's word timing is approximate.
+// - Roman Urdu without it uses Whisper (OpenAI or WHISPER_BASE_URL).
+// - Otherwise ASR_VENDOR_ORDER or the default fallback chain.
+const VENDORS: AsrVendor[] = ['deepgram', 'assemblyai', 'whisper', 'huggingface', 'gemini'];
+function vendorOrder(romanUrdu: boolean): AsrVendor[] {
+  const pinned = process.env.WHISPER_PROVIDER as AsrVendor | undefined;
+  if (pinned && VENDORS.includes(pinned)) return [pinned];
+  if (romanUrdu) return ['whisper'];
+  return (
+    (process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as AsrVendor[] | undefined) ??
+    DEFAULT_VENDOR_ORDER
+  );
 }
 
 async function setStatus(jobId: string, status: string) {
