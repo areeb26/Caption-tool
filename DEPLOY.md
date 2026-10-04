@@ -32,7 +32,8 @@ docker compose up -d --build
 DOMAIN=203-0-113-5.sslip.io
 NEXTAUTH_URL=https://203-0-113-5.sslip.io
 NEXTAUTH_SECRET=<output of: openssl rand -base64 32>
-OPENAI_API_KEY=sk-...          # Whisper + Roman Urdu transliteration
+OPENAI_API_KEY=sk-...          # Whisper transcription
+GEMINI_API_KEY=                # optional: Gemini does the Roman Urdu transliteration
 ADMIN_USERNAME=youradmin
 ADMIN_PASSWORD=a-long-password
 ```

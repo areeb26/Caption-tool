@@ -10,9 +10,14 @@ export async function transcribeWithWhisper(
   audioUrl: string,
   language?: string
 ): Promise<TranscriptResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new AsrError('whisper', 'OPENAI_API_KEY is not set');
+  // WHISPER_BASE_URL points at any OpenAI-compatible transcription server
+  // (a local faster-whisper/whisper.cpp server, Groq, ...). Local servers
+  // usually need no key; the hosted OpenAI API does.
+  const customBase = process.env.WHISPER_BASE_URL?.replace(/\/+$/, '');
+  const baseUrl = customBase || 'https://api.openai.com/v1';
+  const apiKey = process.env.WHISPER_API_KEY || process.env.OPENAI_API_KEY;
+  if (!apiKey && !customBase) {
+    throw new AsrError('whisper', 'OPENAI_API_KEY is not set (or set WHISPER_BASE_URL for a local server)');
   }
 
   // Local-storage mode hands back a same-origin relative path; Node's fetch
@@ -38,9 +43,9 @@ export async function transcribeWithWhisper(
   // timestamp_granularities is only honored by whisper-1 in verbose_json mode.
   form.append('timestamp_granularities[]', 'word');
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const res = await fetch(`${baseUrl}/audio/transcriptions`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
     body: form,
   }).catch((err) => {
     throw new AsrError('whisper', 'request failed', err);
