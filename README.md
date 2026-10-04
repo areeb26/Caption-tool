@@ -50,6 +50,27 @@ with live preview → server renders a burned-in MP4 → download.
    `db/schema.ts`.
 5. `npm run dev` and open http://localhost:3000.
 
+### Running on Windows (PowerShell)
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+winget install Git.Git
+winget install Gyan.FFmpeg      # then open a NEW PowerShell window
+
+git clone https://github.com/areeb26/Caption-tool.git
+cd Caption-tool
+npm install
+copy .env.example .env
+notepad .env
+npx drizzle-kit push
+npm run dev                      # http://localhost:3000
+```
+
+Gemini-only setup (no OpenAI): in `.env` set `GEMINI_API_KEY=...` and
+`WHISPER_PROVIDER=gemini`, then pick **Roman Urdu** on the upload page. Gemini
+returns timed segments rather than per-word times, so caption timing is
+approximate. For exact word timing use Whisper (OpenAI, local, or Hugging Face).
+
 ### Using real ASR vendors locally
 
 Deepgram/AssemblyAI/Whisper need to fetch (or receive) your audio file over

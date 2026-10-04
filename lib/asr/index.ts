@@ -2,6 +2,7 @@ import { transcribeWithDeepgram } from './deepgram';
 import { transcribeWithAssemblyAI } from './assemblyai';
 import { transcribeWithWhisper } from './whisper';
 import { transcribeWithHuggingFace } from './huggingface';
+import { transcribeWithGemini } from './gemini';
 import { AsrError, type AsrVendor, type TranscriptResult } from './types';
 
 export * from './types';
@@ -20,6 +21,8 @@ export async function transcribe(
       return transcribeWithWhisper(audioUrl, language);
     case 'huggingface':
       return transcribeWithHuggingFace(audioUrl, language);
+    case 'gemini':
+      return transcribeWithGemini(audioUrl, language);
     default:
       throw new AsrError(vendor, `unknown ASR vendor`);
   }

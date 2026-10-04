@@ -10,7 +10,7 @@ export interface TranscriptResult {
   raw?: unknown;
 }
 
-export type AsrVendor = 'deepgram' | 'assemblyai' | 'whisper' | 'huggingface';
+export type AsrVendor = 'deepgram' | 'assemblyai' | 'whisper' | 'huggingface' | 'gemini';
 
 export class AsrError extends Error {
   constructor(

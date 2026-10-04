@@ -50,7 +50,7 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
     // pin the language). WHISPER_PROVIDER=huggingface runs it on Hugging Face.
     const romanUrdu = job.language === 'roman-urdu';
     const preferredOrder: AsrVendor[] = romanUrdu
-      ? [process.env.WHISPER_PROVIDER === 'huggingface' ? 'huggingface' : 'whisper']
+      ? [romanAsrVendor()]
       : ((process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as AsrVendor[] | undefined) ??
         DEFAULT_VENDOR_ORDER);
 
@@ -84,6 +84,13 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
   } finally {
     await fs.rm(workDir, { recursive: true, force: true });
   }
+}
+
+// WHISPER_PROVIDER picks the Roman Urdu transcription engine:
+// 'huggingface', 'gemini' (approximate word timing), or default OpenAI/local Whisper.
+function romanAsrVendor(): AsrVendor {
+  const p = process.env.WHISPER_PROVIDER;
+  return p === 'huggingface' || p === 'gemini' ? p : 'whisper';
 }
 
 async function setStatus(jobId: string, status: string) {
