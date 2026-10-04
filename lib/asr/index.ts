@@ -1,6 +1,7 @@
 import { transcribeWithDeepgram } from './deepgram';
 import { transcribeWithAssemblyAI } from './assemblyai';
 import { transcribeWithWhisper } from './whisper';
+import { transcribeWithHuggingFace } from './huggingface';
 import { AsrError, type AsrVendor, type TranscriptResult } from './types';
 
 export * from './types';
@@ -17,13 +18,15 @@ export async function transcribe(
       return transcribeWithAssemblyAI(audioUrl);
     case 'whisper':
       return transcribeWithWhisper(audioUrl, language);
+    case 'huggingface':
+      return transcribeWithHuggingFace(audioUrl, language);
     default:
       throw new AsrError(vendor, `unknown ASR vendor`);
   }
 }
 
 /** Default vendor order per the PRD's ASR recommendation. */
-export const DEFAULT_VENDOR_ORDER: AsrVendor[] = ['deepgram', 'assemblyai', 'whisper'];
+export const DEFAULT_VENDOR_ORDER: AsrVendor[] = ['deepgram', 'assemblyai', 'whisper', 'huggingface'];
 
 /**
  * Try vendors in order, falling back to the next on failure (including a

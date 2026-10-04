@@ -47,10 +47,10 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
     const audioUrl = await getSignedDownloadUrl(audioKey);
     // Roman Urdu: Whisper transcribes Urdu, then we romanize it. Whisper is
     // the only vendor used for this mode (it handles Urdu well and lets us
-    // pin the language).
+    // pin the language). WHISPER_PROVIDER=huggingface runs it on Hugging Face.
     const romanUrdu = job.language === 'roman-urdu';
     const preferredOrder: AsrVendor[] = romanUrdu
-      ? ['whisper']
+      ? [process.env.WHISPER_PROVIDER === 'huggingface' ? 'huggingface' : 'whisper']
       : ((process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as AsrVendor[] | undefined) ??
         DEFAULT_VENDOR_ORDER);
 
