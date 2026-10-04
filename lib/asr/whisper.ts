@@ -6,13 +6,21 @@ import { AsrError, type TranscriptResult, type TranscriptWord } from './types';
  * audio bytes from our storage layer's signed URL first, then forward
  * them as multipart/form-data.
  */
-export async function transcribeWithWhisper(audioUrl: string): Promise<TranscriptResult> {
+export async function transcribeWithWhisper(
+  audioUrl: string,
+  language?: string
+): Promise<TranscriptResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new AsrError('whisper', 'OPENAI_API_KEY is not set');
   }
 
-  const audioRes = await fetch(audioUrl).catch((err) => {
+  // Local-storage mode hands back a same-origin relative path; Node's fetch
+  // needs an absolute URL, so resolve it against this server itself.
+  const absoluteUrl = audioUrl.startsWith('/')
+    ? `http://127.0.0.1:${process.env.PORT || 3000}${audioUrl}`
+    : audioUrl;
+  const audioRes = await fetch(absoluteUrl).catch((err) => {
     throw new AsrError('whisper', 'failed to fetch audio for upload', err);
   });
   if (!audioRes.ok) {
@@ -25,6 +33,8 @@ export async function transcribeWithWhisper(audioUrl: string): Promise<Transcrip
   form.append('file', new Blob([audioBuf], { type: 'audio/wav' }), 'audio.wav');
   form.append('model', model);
   form.append('response_format', 'verbose_json');
+  // ISO-639-1 hint (e.g. 'ur'); skips auto-detect, which often mislabels Urdu as Hindi/Arabic.
+  if (language) form.append('language', language);
   // timestamp_granularities is only honored by whisper-1 in verbose_json mode.
   form.append('timestamp_granularities[]', 'word');
 

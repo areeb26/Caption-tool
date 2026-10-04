@@ -18,15 +18,34 @@ const DEV_USER_EMAIL = 'dev@localhost';
  */
 export async function getCurrentUserId(): Promise<string | null> {
   const session = await auth();
-  if (session?.user?.id) return session.user.id;
+  if (session?.user?.id) {
+    // JWT sessions outlive account changes, so confirm the user still
+    // exists and hasn't been disabled by an admin.
+    const user = await getUser(session.user.id);
+    return user && !user.disabled ? user.id : null;
+  }
 
-  const noProvidersConfigured = !configuredProviders.google && !configuredProviders.email;
+  const noProvidersConfigured =
+    !configuredProviders.google && !configuredProviders.email && !configuredProviders.credentials;
   if (noProvidersConfigured && process.env.NODE_ENV !== 'production') {
     await ensureDevUser();
     return DEV_USER_ID;
   }
 
   return null;
+}
+
+export async function getUser(id: string) {
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+  return user ?? null;
+}
+
+/** The signed-in user if they are an enabled admin, else null. */
+export async function getCurrentAdmin() {
+  const id = await getCurrentUserId();
+  if (!id) return null;
+  const user = await getUser(id);
+  return user?.role === 'admin' ? user : null;
 }
 
 let devUserEnsured = false;

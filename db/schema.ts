@@ -13,6 +13,12 @@ export const users = sqliteTable('users', {
   email: text('email').notNull(),
   emailVerified: integer('emailVerified', { mode: 'timestamp_ms' }),
   image: text('image'),
+  // Username/password accounts created from /admin (see lib/users.ts).
+  // Google/email users leave these null.
+  username: text('username'),
+  passwordHash: text('passwordHash'),
+  role: text('role').notNull().default('user'), // 'user' | 'admin'
+  disabled: integer('disabled').notNull().default(0),
 });
 
 export const accounts = sqliteTable('accounts', {
@@ -73,6 +79,9 @@ export const jobs = sqliteTable('jobs', {
   presetId: text('presetId').notNull().default('viral-yellow'),
 
   asrVendor: text('asrVendor'),
+
+  // Caption language chosen at upload: 'auto' | 'en' | 'roman-urdu' (see lib/languages.ts).
+  language: text('language').notNull().default('auto'),
 
   deletedAt: integer('deletedAt', { mode: 'timestamp_ms' }),
   createdAt: integer('createdAt', { mode: 'timestamp_ms' })

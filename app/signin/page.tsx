@@ -1,7 +1,14 @@
 import { signIn, configuredProviders } from '@/auth';
+import { AuthError } from 'next-auth';
 import { redirect } from 'next/navigation';
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   async function googleSignIn() {
     'use server';
     await signIn('google', { redirectTo: '/dashboard' });
@@ -13,12 +20,28 @@ export default function SignInPage() {
     await signIn('nodemailer', { email, redirectTo: '/dashboard' });
   }
 
+  async function passwordSignIn(formData: FormData) {
+    'use server';
+    try {
+      await signIn('credentials', {
+        username: String(formData.get('username') || ''),
+        password: String(formData.get('password') || ''),
+        redirectTo: '/dashboard',
+      });
+    } catch (err) {
+      // signIn signals success via a redirect (thrown); only swallow auth failures.
+      if (err instanceof AuthError) redirect('/signin?error=1');
+      throw err;
+    }
+  }
+
   async function devSignIn() {
     'use server';
     redirect('/dashboard');
   }
 
-  const noProvidersConfigured = !configuredProviders.google && !configuredProviders.email;
+  const noProvidersConfigured =
+    !configuredProviders.google && !configuredProviders.email && !configuredProviders.credentials;
 
   return (
     <main className="container" style={{ maxWidth: 420, paddingTop: 80 }}>
@@ -33,6 +56,28 @@ export default function SignInPage() {
           In development, the app falls back to a local &quot;dev user&quot; automatically — just
           continue below.
         </div>
+      )}
+
+      {error && <div className="error-box">Wrong username or password.</div>}
+
+      {configuredProviders.credentials && (
+      <form action={passwordSignIn}>
+        <div className="form-field">
+          <label htmlFor="username">Username</label>
+          <input id="username" name="username" required autoComplete="username" />
+        </div>
+        <div className="form-field">
+          <label htmlFor="password">Password</label>
+          <input id="password" name="password" type="password" required autoComplete="current-password" />
+        </div>
+        <button className="btn btn-primary" style={{ width: '100%' }} type="submit">
+          Sign in
+        </button>
+      </form>
+      )}
+
+      {configuredProviders.credentials && (configuredProviders.google || configuredProviders.email) && (
+        <div className="divider-or">or</div>
       )}
 
       {configuredProviders.google && (

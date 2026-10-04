@@ -1,8 +1,10 @@
 import NextAuth, { type NextAuthConfig } from 'next-auth';
 import Google from 'next-auth/providers/google';
+import Credentials from 'next-auth/providers/credentials';
 import Nodemailer from 'next-auth/providers/nodemailer';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { db, schema } from '@/db';
+import { authenticate } from '@/lib/users';
 
 // Only register providers whose env vars are actually configured, so the
 // app still boots (and other providers still work) when e.g. Google OAuth
@@ -29,6 +31,18 @@ if (process.env.EMAIL_SERVER && process.env.EMAIL_FROM) {
   );
 }
 
+// Username/password accounts, created by an admin at /admin. Always
+// registered; the first admin comes from ADMIN_USERNAME/ADMIN_PASSWORD.
+providers.push(
+  Credentials({
+    credentials: { username: {}, password: {} },
+    async authorize(creds) {
+      const user = await authenticate(creds?.username, creds?.password);
+      return user ? { id: user.id, name: user.name, email: user.email } : null;
+    },
+  })
+);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: schema.users,
@@ -36,7 +50,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: schema.sessions,
     verificationTokensTable: schema.verificationTokens,
   }),
-  session: { strategy: 'database' },
+  // Credentials sign-in requires JWT sessions in Auth.js.
+  session: { strategy: 'jwt' },
+  callbacks: {
+    jwt({ token, user }) {
+      if (user?.id) token.sub = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user && token.sub) session.user.id = token.sub;
+      return session;
+    },
+  },
   providers,
   // Falls back to an insecure fixed secret outside production so the app
   // boots without extra setup; NEXTAUTH_SECRET is required in production.
@@ -48,5 +73,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 export const configuredProviders = {
   google: providers.some((p) => (typeof p === 'function' ? p() : p).id === 'google'),
+  credentials: !!(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD),
   email: providers.some((p) => (typeof p === 'function' ? p() : p).id === 'nodemailer'),
 };

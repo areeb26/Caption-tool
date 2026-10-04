@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { db, schema } from '@/db';
-import { getCurrentUserId } from '@/lib/auth-helpers';
+import { getCurrentUserId, getUser } from '@/lib/auth-helpers';
 import { redirect } from 'next/navigation';
 
 function formatRelativeTime(date: Date): string {
@@ -19,6 +19,8 @@ export default async function DashboardPage() {
   const userId = await getCurrentUserId();
   if (!userId) redirect('/signin');
 
+  const me = await getUser(userId);
+
   const jobs = await db
     .select()
     .from(schema.jobs)
@@ -29,9 +31,16 @@ export default async function DashboardPage() {
     <main className="container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>Your projects</h1>
-        <Link href="/upload" className="btn btn-primary">
-          New project
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {me?.role === 'admin' && (
+            <Link href="/admin" className="btn btn-secondary">
+              Users
+            </Link>
+          )}
+          <Link href="/upload" className="btn btn-primary">
+            New project
+          </Link>
+        </div>
       </div>
 
       {jobs.length === 0 ? (
