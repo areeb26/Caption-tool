@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { desc, eq, isNull, and } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { getCurrentUserId } from '@/lib/auth-helpers';
+import { parseCaptionLanguage } from '@/lib/languages';
 
 export async function GET() {
   const userId = await getCurrentUserId();
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
     name,
     status: 'pending',
     presetId: 'viral-yellow',
+    language: parseCaptionLanguage(body?.language),
   });
 
   return NextResponse.json({ id });

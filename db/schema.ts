@@ -74,6 +74,9 @@ export const jobs = sqliteTable('jobs', {
 
   asrVendor: text('asrVendor'),
 
+  // Caption language chosen at upload: 'auto' | 'en' | 'roman-urdu' (see lib/languages.ts).
+  language: text('language').notNull().default('auto'),
+
   deletedAt: integer('deletedAt', { mode: 'timestamp_ms' }),
   createdAt: integer('createdAt', { mode: 'timestamp_ms' })
     .notNull()

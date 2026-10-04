@@ -45,10 +45,10 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
       .where(eq(schema.jobs.id, jobId));
 
     const audioUrl = await getSignedDownloadUrl(audioKey);
-    // CAPTION_LANGUAGE=roman-urdu: Whisper transcribes Urdu, then we romanize it.
-    // Whisper is the only vendor used for this mode (it handles Urdu well and
-    // lets us pin the language).
-    const romanUrdu = process.env.CAPTION_LANGUAGE === 'roman-urdu';
+    // Roman Urdu: Whisper transcribes Urdu, then we romanize it. Whisper is
+    // the only vendor used for this mode (it handles Urdu well and lets us
+    // pin the language).
+    const romanUrdu = job.language === 'roman-urdu';
     const preferredOrder: AsrVendor[] = romanUrdu
       ? ['whisper']
       : ((process.env.ASR_VENDOR_ORDER?.split(',').filter(Boolean) as AsrVendor[] | undefined) ??
@@ -57,7 +57,7 @@ export async function runProcessingPipeline(jobId: string): Promise<void> {
     const transcript = await transcribeWithFallback(
       preferredOrder,
       audioUrl,
-      romanUrdu ? 'ur' : undefined
+      romanUrdu ? 'ur' : job.language === 'en' ? 'en' : undefined
     );
     if (romanUrdu) transcript.words = await romanizeUrduWords(transcript.words);
 

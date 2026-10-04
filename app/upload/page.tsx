@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { CAPTION_LANGUAGES, type CaptionLanguage } from '@/lib/languages';
 
 const MAX_BYTES = 500 * 1024 * 1024;
 const MAX_DURATION_SEC = 3 * 60;
@@ -13,6 +14,7 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [language, setLanguage] = useState<CaptionLanguage>('auto');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = useCallback((file: File): Promise<string | null> => {
@@ -55,7 +57,7 @@ export default function UploadPage() {
         const createRes = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: file.name.replace(/\.[^.]+$/, '') }),
+          body: JSON.stringify({ name: file.name.replace(/\.[^.]+$/, ''), language }),
         });
         if (!createRes.ok) throw new Error('Could not create project.');
         const { id: jobId } = await createRes.json();
@@ -82,7 +84,7 @@ export default function UploadPage() {
         setBusy(false);
       }
     },
-    [router, validate]
+    [router, validate, language]
   );
 
   return (
@@ -94,6 +96,23 @@ export default function UploadPage() {
       </p>
 
       {error && <div className="error-box">{error}</div>}
+
+      <label style={{ display: 'block', marginBottom: 16 }}>
+        <span style={{ display: 'block', marginBottom: 6, color: 'var(--text-dim)' }}>
+          Caption language
+        </span>
+        <select
+          value={language}
+          disabled={busy}
+          onChange={(e) => setLanguage(e.target.value as CaptionLanguage)}
+        >
+          {CAPTION_LANGUAGES.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div
         className={`dropzone${dragOver ? ' dragover' : ''}`}
