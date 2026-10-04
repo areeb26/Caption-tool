@@ -71,6 +71,36 @@ Gemini-only setup (no OpenAI): in `.env` set `GEMINI_API_KEY=...` and
 returns timed segments rather than per-word times, so caption timing is
 approximate. For exact word timing use Whisper (OpenAI, local, or Hugging Face).
 
+### Free local Whisper (Windows)
+
+Runs Whisper on your own PC with `tools/whisper-server`. First run downloads
+the model (~460 MB for `small`). Use two PowerShell windows.
+
+```powershell
+# one-time
+winget install Python.Python.3.12        # then open a NEW PowerShell window
+cd Caption-tool\tools\whisper-server
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+
+# every time you want captions: window 1
+python -m uvicorn server:app --port 8000
+```
+
+In `.env` (project root), then run `npm run dev` in window 2:
+
+```
+WHISPER_BASE_URL=http://localhost:8000/v1
+WHISPER_PROVIDER=
+GEMINI_API_KEY=...          # Roman Urdu conversion step
+```
+
+Model size: `$env:WHISPER_SIZE="base"` (faster) or `"medium"` (more accurate)
+before starting the server. On a PC with an NVIDIA GPU, also set
+`$env:WHISPER_DEVICE="cuda"`. CPU speed: roughly real-time or slower for
+`small`/`medium`.
+
 ### Using real ASR vendors locally
 
 Deepgram/AssemblyAI/Whisper need to fetch (or receive) your audio file over
